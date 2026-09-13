@@ -14,6 +14,6 @@ public class SpeechController {
     
     @GetMapping("/api/test")
     public String test() {
-        	return "API is working!!";
+        	return transcriptionService.checkApiKey();
     }
 }

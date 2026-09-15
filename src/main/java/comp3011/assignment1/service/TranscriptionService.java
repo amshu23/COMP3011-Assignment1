@@ -1,94 +1,106 @@
 package comp3011.assignment1.service;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+
 import java.io.ByteArrayOutputStream;
-import comp3011.assignment1.config.OpenAiConfig;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import org.springframework.stereotype.Service;
-import java.io.ByteArrayOutputStream;
-import comp3011.assignment1.service.ServerStatsService;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.stereotype.Service;
+import comp3011.assignment1.config.OpenAiConfig;
 
 @Service
 public class TranscriptionService {
-	private final OpenAiConfig openAiConfig;
-	private final ServerStatsService statsService;
-	private final ObjectMapper objectMapper;
-	private static final String OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 
-	private static final String MODEL_NAME = "gpt-4o-mini-transcribe";
-	private final HttpClient httpClient;
-	
-	public TranscriptionService(
-	        OpenAiConfig openAiConfig,
-	        ObjectMapper objectMapper,
-	        ServerStatsService statsService) {
+    private final OpenAiConfig openAiConfig;
+    private final ServerStatsService statsService;
+    private final ObjectMapper objectMapper;
 
-	    this.openAiConfig = openAiConfig;
-	    this.objectMapper = objectMapper;
-	    this.statsService = statsService;
+    @Value("${openai.transcription-url:https://api.openai.com/v1/audio/transcriptions}")
+    private String transcriptionUrl;
 
-	    this.httpClient = HttpClient.newBuilder()
-	            .connectTimeout(Duration.ofSeconds(10))
-	            .build();
-	}
-			
-	public String checkApiKey()
-	{
-		String apiKey = openAiConfig.getApiKey();
-		
-		if(apiKey == null || apiKey.isBlank())
-		{
-			return "OpenAI API key is not yet configured.";
-	
-		}
-		
-		return "OpenAI API key has been configured....";
-	}
-	
-	public CompletableFuture<String> transcribe(MultipartFile audioFile) {
+    private static final String MODEL_NAME =
+            "gpt-4o-mini-transcribe";
 
-	    String apiKey = openAiConfig.getApiKey();
+    private final HttpClient httpClient;
 
-	    if (apiKey == null || apiKey.isBlank()) {
-	        return CompletableFuture.failedFuture(new IllegalStateException("OpenAI API key is not configured.")
-	        );
-	    }
+    public TranscriptionService(
+            OpenAiConfig openAiConfig,
+            ObjectMapper objectMapper,
+            ServerStatsService statsService) {
 
-	    try {
-	    	byte[] audioData = audioFile.getBytes();
+        this.openAiConfig = openAiConfig;
+        this.objectMapper = objectMapper;
+        this.statsService = statsService;
 
-	    	String boundry = "Boundary...Java" + System.currentTimeMillis();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+    }
 
-	    	String contentType = audioFile.getContentType();
+    public String checkApiKey() {
 
-	    	if (contentType == null || contentType.isBlank()) {
-	    	    contentType = "application/octet-stream";
-	    	}
-	    	String fileName = audioFile.getOriginalFilename();
+        String apiKey = openAiConfig.getApiKey();
 
-	    	if (fileName == null || fileName.isBlank()) {
-	    	    fileName = "audio.webm";
-	    	}
-	    	
-	    	ByteArrayOutputStream body =
+        if (apiKey == null || apiKey.isBlank()) {
+            return "OpenAI API key is not yet configured.";
+        }
+
+        return "OpenAI API key has been configured....";
+    }
+
+    public CompletableFuture<String> transcribe(
+            MultipartFile audioFile) {
+
+        String apiKey = openAiConfig.getApiKey();
+
+        if (apiKey == null || apiKey.isBlank()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException(
+                            "OpenAI API key is not configured."
+                    )
+            );
+        }
+
+        try {
+
+            byte[] audioData = audioFile.getBytes();
+
+            String boundary =
+                    "BoundaryJava" + System.nanoTime();
+
+            String contentType =
+                    audioFile.getContentType();
+
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+
+            String fileName =
+                    audioFile.getOriginalFilename();
+
+            if (fileName == null || fileName.isBlank()) {
+                fileName = "audio.webm";
+            }
+
+            ByteArrayOutputStream body =
                     new ByteArrayOutputStream();
-	    	
-	    	body.write(
-                    ("--" + boundry + "\r\n")
+
+            body.write(
+                    ("--" + boundary + "\r\n")
                             .getBytes(StandardCharsets.UTF_8)
             );
-	    	
-	    	body.write(
+
+            body.write(
                     "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
                             .getBytes(StandardCharsets.UTF_8)
             );
@@ -98,15 +110,15 @@ public class TranscriptionService {
                             .getBytes(StandardCharsets.UTF_8)
             );
 
-            // File part
             body.write(
-                    ("--" + boundry + "\r\n")
+                    ("--" + boundary + "\r\n")
                             .getBytes(StandardCharsets.UTF_8)
             );
 
             body.write(
                     ("Content-Disposition: form-data; name=\"file\"; filename=\""
-                            + fileName + "\"\r\n")
+                            + fileName
+                            + "\"\r\n")
                             .getBytes(StandardCharsets.UTF_8)
             );
 
@@ -117,32 +129,34 @@ public class TranscriptionService {
 
             body.write(audioData);
 
-            // End of multipart request
             body.write(
-                    ("\r\n--" + boundry + "--\r\n")
+                    ("\r\n--" + boundary + "--\r\n")
                             .getBytes(StandardCharsets.UTF_8)
             );
 
-            // Create HTTP request
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(OPENAI_URL))
-                    .timeout(Duration.ofSeconds(30))
-                    .header(
-                            "Authorization",
-                            "Bearer " + apiKey
-                    )
-                    .header(
-                            "Content-Type",
-                            "multipart/form-data; boundary=" + boundry
-                    )
-                    .POST(
-                            HttpRequest.BodyPublishers.ofByteArray(
-                                    body.toByteArray()
-                            )
-                    )
-                    .build();
+           
 
-            // Send request asynchronously
+            HttpRequest request =
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(transcriptionUrl))
+                            .timeout(Duration.ofSeconds(30))
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + apiKey
+                            )
+                            .header(
+                                    "Content-Type",
+                                    "multipart/form-data; boundary="
+                                            + boundary
+                            )
+                            .POST(
+                                    HttpRequest.BodyPublishers
+                                            .ofByteArray(
+                                                    body.toByteArray()
+                                            )
+                            )
+                            .build();
+
             return httpClient
                     .sendAsync(
                             request,
@@ -150,7 +164,6 @@ public class TranscriptionService {
                     )
                     .thenApply(response -> {
 
-                        // OpenAI request failed
                         if (response.statusCode() < 200
                                 || response.statusCode() >= 300) {
 
@@ -162,16 +175,28 @@ public class TranscriptionService {
 
                         try {
 
-                        	JsonNode json = objectMapper.readTree(response.body());
+                            JsonNode json =
+                                    objectMapper.readTree(
+                                            response.body()
+                                    );
 
-                        	JsonNode usage = json.path("usage");
+                            JsonNode usage =
+                                    json.path("usage");
 
-                        	long inputTokens = usage.path("input_tokens").asLong(0);
-                        	long outputTokens = usage.path("output_tokens").asLong(0);
+                            long inputTokens =
+                                    usage.path("input_tokens")
+                                            .asLong(0);
 
-                        	statsService.addTokenUsage(inputTokens, outputTokens);
+                            long outputTokens =
+                                    usage.path("output_tokens")
+                                            .asLong(0);
 
-                        	return json.path("text").asText();
+                            statsService.addTokenUsage(
+                                    inputTokens,
+                                    outputTokens
+                            );
+
+                            return json.path("text").asText();
 
                         } catch (Exception e) {
 
@@ -186,5 +211,5 @@ public class TranscriptionService {
 
             return CompletableFuture.failedFuture(e);
         }
-	}
+    }
 }

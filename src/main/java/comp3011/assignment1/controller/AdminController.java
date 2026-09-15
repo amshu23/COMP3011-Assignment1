@@ -1,17 +1,18 @@
 package comp3011.assignment1.controller;
 
 import java.time.Duration;
-import org.springframework.web.bind.annotation.GetMapping;
 import java.time.Instant;
-import org.springframework.http.ResponseEntity;
 import java.util.concurrent.CompletableFuture;
-import comp3011.assignment1.service.ServerStatsService;
-
-import org.springframework.web.bind.annotation.PostMapping;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.RestController;
+
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import comp3011.assignment1.service.ServerStatsService;
 
 @RestController
 public class AdminController {
@@ -21,7 +22,8 @@ public class AdminController {
 
     private final Instant serverStartTime;
 
-    private final AtomicBoolean shutdownStarted = new AtomicBoolean(false);
+    private final AtomicBoolean shutdownStarted =
+            new AtomicBoolean(false);
 
     public AdminController(
             ServerStatsService statsService,
@@ -58,13 +60,21 @@ public class AdminController {
     }
 
     @PostMapping("/api/v1/admin/shutdown")
-    public ResponseEntity<ShutdownResponse> shutdown() {
+    public ResponseEntity<?> shutdown() {
 
         if (!shutdownStarted.compareAndSet(false, true)) {
 
+            ErrorResponse error = new ErrorResponse(
+                    Instant.now(),
+                    409,
+                    "Conflict",
+                    "Shutdown has already been requested.",
+                    "/api/v1/admin/shutdown"
+            );
+
             return ResponseEntity
                     .status(HttpStatus.CONFLICT)
-                    .build();
+                    .body(error);
         }
 
         CompletableFuture.runAsync(() -> {
@@ -95,6 +105,15 @@ public class AdminController {
     public record GlobalStatsResponse(
             long inputTokens,
             long outputTokens
+    ) {
+    }
+
+    public record ErrorResponse(
+            Instant timestamp,
+            int status,
+            String error,
+            String message,
+            String path
     ) {
     }
 }

@@ -1,13 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Speech to Text</title>
+
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
+    <main>
 
-    <h1>Speech to Text</h1>
+        <h1>Speech to Text</h1>
 
-    <p>My Cloud Assignment 1 website is working!</p>
+        <p>
+            Record your voice and convert it into text.
+        </p>
+
+        <div>
+            <button id="startButton">
+                Start Recording
+            </button>
+
+            <button id="stopButton" disabled>
+                Stop Recording
+            </button>
+        </div>
+
+        <p id="statusMessage">
+            Ready to record.
+        </p>
+
+        <section>
+            <h2>Transcription</h2>
+
+            <p id="resultText">
+                Your transcription will appear here.
+            </p>
+        </section>
+
+    </main>
+
+    <script src="script.js"></script>
 
 </body>
-	</html>
+
+</html>
